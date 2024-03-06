@@ -6,7 +6,7 @@ The core of this project is to enhance chatbot interactions by incorporating a c
 
 # Components
 ## Vector Database
-A manually crafted vector database is at the forefront of this endeavor. It stores vectors and their corresponding messages, allowing for the addition of new interactions and the retrieval of similar past messages based on vector similarity.
+A custom vector database is used in this project; it stores vectors and their corresponding messages, allowing for the addition of new interactions and the retrieval of similar past messages based on vector similarity.
 
 ## Encoding Messages
 The SentenceTransformer library is utilized for converting textual messages into vector representations. This conversion is crucial for comparing semantic similarities between messages, enabling the system to identify and retrieve relevant past interactions.
