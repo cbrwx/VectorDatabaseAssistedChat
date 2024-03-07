@@ -22,7 +22,8 @@ class SimpleVectorDatabase:
         if self.filepath:  # If a filepath is provided, attempt to load existing data
             self.load()
 
-    def add_vector(self, vector, message):
+    def add_vector(self, vector, message, msg_type):
+        vector = np.array(vector)  # Ensure the input vector is a NumPy array
         if self.vectors is None:
             self.vectors = np.array([vector])
         else:
@@ -31,7 +32,9 @@ class SimpleVectorDatabase:
                 self.vectors = np.array(self.vectors)
             self.vectors = np.vstack([self.vectors, vector])
         self.messages.append(message)
-        self.save()  # Save the database state after adding a new vector/message
+        self.types.append(msg_type)  # Store the type of the message
+        self.save()
+
         
     def add_interaction(self, query_vector, query_message, response_vector, response_message):
         # Adds both the query and the response to the database
@@ -57,7 +60,7 @@ class SimpleVectorDatabase:
         if not self.filepath:
             return  # Do nothing if no filepath is set
         with open(self.filepath, 'wb') as f:
-            pickle.dump({'vectors': self.vectors, 'messages': self.messages}, f)
+            pickle.dump({'vectors': self.vectors, 'messages': self.messages, 'types': self.types}, f)
 
     def load(self):
         try:
@@ -65,8 +68,11 @@ class SimpleVectorDatabase:
                 data = pickle.load(f)
                 self.vectors = data['vectors']
                 self.messages = data['messages']
+                self.types = data.get('types', [])  # Ensure backward compatibility
         except (FileNotFoundError, EOFError):
-            pass  
+            self.vectors = None
+            self.messages = []
+            self.types = []
         
 vector_db = SimpleVectorDatabase(filepath='vector_database.pkl')        
 
@@ -90,24 +96,21 @@ def chat(user_input, context_messages=[]):
     
     if context_messages:
         recent_context = context_messages[-1]  # last message is the most relevant
-        background_context = " ".join(context_messages[:-1]) if len(context_messages) > 1 else ""
-        
+        background_context = " ".join(context_messages[:-1]) if len(context_messages) > 1 else ""        
         recent_context_formatted = f"\n--- Most Recent Context:\n{recent_context}."
-        background_context_formatted = f"\n--- Background Information:\n{background_context}." if background_context else ""
-        
+        background_context_formatted = f"\n--- Background Information:\n{background_context}." if background_context else ""        
         full_context = f"{instruction} {recent_context_formatted} {background_context_formatted}"
     else:
         full_context = instruction
 
-    # Update the global conversation history with clear labeling for user and model
-    # Trim before appending to ensure we only keep the last 2000 chars
-    if len(global_conversation_history) > 2000:
-        global_conversation_history = global_conversation_history[-2000:]
+    # Update the global conversation history with clear labeling for user and model, trim at 5000 chars
+    if len(global_conversation_history) > 5000:
+        global_conversation_history = global_conversation_history[-5000:]
     global_conversation_history += f"\nUser: {user_input}"
 
     user_query = f"\n--- Priority Instruction: Respond directly to the user's current query below. It is imperative that this query is the main focus of your response. While formulating your answer, please integrate and consider all available contextual information provided. This query is the central point of your response, and all other context should support in understanding and addressing this specific inquiry: {user_input}"
     # Include both the vector-based context and conversation history in the message sent to the model
-    full_message = f"{full_context}\n{vector_based_context}\n--- Conversation History (up to 2000 chars):\n{global_conversation_history}\n{user_query}"
+    full_message = f"{full_context}\n{vector_based_context}\n--- Conversation History (up to 5000 chars):\n{global_conversation_history}\n{user_query}"
 
     print("\nSending the following structured message to the model for context:\n")
     print(full_message)
@@ -138,15 +141,14 @@ def chat(user_input, context_messages=[]):
                     break
 
         # Trim before appending to keep the last 2000 chars
-        if len(global_conversation_history) + len(f"\nModel: {output}") > 2000:
-            global_conversation_history = global_conversation_history[-(2000-len(f"\nModel: {output}")):]
-        global_conversation_history += f"\nModel: {output}"
+        if len(global_conversation_history) + len(f"\nOdinAI: {output}") > 5000:
+            global_conversation_history = global_conversation_history[-(5000-len(f"\nOdinAI: {output}")):]
+        global_conversation_history += f"\nOdinAI: {output}"
 
         return {"content": output}
     except requests.RequestException as e:
         print(f"Request failed: {e}")
         return {"content": "Error processing your request."}
-
 
 # initialize little cars
 text_area = widgets.Textarea(
@@ -177,22 +179,20 @@ def on_send_button_clicked(b):
 
         #print(f"User: {user_input}")
         input_vector = encode_message_to_vector(user_input)
-        # retrieve similar messages as context
-        similar_messages = vector_db.find_similar_messages(input_vector, n=5)
-        # extract just the message content for context
-        context_messages = [msg for msg in similar_messages]
+        vector_db.add_vector(input_vector, user_input, 'user')  # Add user input as 'user'
 
-        # call the chat function with user input and context
+        # Retrieve similar messages as context and process the input
+        similar_messages = vector_db.find_similar_messages(input_vector, n=5)
+        context_messages = [msg for msg in similar_messages]
         response = chat(user_input, context_messages)
         print(f"OdinAI: {response['content']}")
 
-        # store the user input and bot response in the vector database
-        vector_db.add_vector(input_vector, user_input)
+        # After receiving the response from the model, encode it and add to the database as a 'model' type message
         if response['content']:
             response_vector = encode_message_to_vector(response['content'])
-            vector_db.add_vector(response_vector, response['content'])
+            vector_db.add_vector(response_vector, response['content'], 'model')  # Add model response as 'model'
 
-        text_area.value = ''  
+        text_area.value = ''
 
 # Attach event to the send button
 send_button.on_click(on_send_button_clicked)
