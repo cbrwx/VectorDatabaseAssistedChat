@@ -105,7 +105,7 @@ def chat(user_input, context_messages=[]):
         global_conversation_history = global_conversation_history[-2000:]
     global_conversation_history += f"\nUser: {user_input}"
 
-    user_query = f"\n--- User's Current Query and your main task while taking all other information relevant into consideration:\n{user_input}"
+    user_query = f"\n--- Priority Instruction: Respond directly to the user's current query below. It is imperative that this query is the main focus of your response. While formulating your answer, please integrate and consider all available contextual information provided. This query is the central point of your response, and all other context should support in understanding and addressing this specific inquiry: {user_input}"
     # Include both the vector-based context and conversation history in the message sent to the model
     full_message = f"{full_context}\n{vector_based_context}\n--- Conversation History (up to 2000 chars):\n{global_conversation_history}\n{user_query}"
 
@@ -147,6 +147,7 @@ def chat(user_input, context_messages=[]):
         print(f"Request failed: {e}")
         return {"content": "Error processing your request."}
 
+
 # initialize little cars
 text_area = widgets.Textarea(
     placeholder='Type your message here...',
@@ -180,9 +181,11 @@ def on_send_button_clicked(b):
         similar_messages = vector_db.find_similar_messages(input_vector, n=5)
         # extract just the message content for context
         context_messages = [msg for msg in similar_messages]
+
         # call the chat function with user input and context
         response = chat(user_input, context_messages)
         print(f"OdinAI: {response['content']}")
+
         # store the user input and bot response in the vector database
         vector_db.add_vector(input_vector, user_input)
         if response['content']:
