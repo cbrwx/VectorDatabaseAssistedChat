@@ -1,3 +1,6 @@
+
+![sdfsdfsdfds](https://github.com/cbrwx/VectorDatabaseAssistedChat/assets/81207429/7dbb6018-4d36-4507-b032-87dbfbf63a0b)
+
 # Vector Database-Assisted Chat Interface 
 Outlines the implementation details and usage instructions for a chat interface that utilizes a vector database for storing and retrieving conversation history to enhance the contextual relevance of responses. The project integrates local language model management via Ollama and leverages Jupyter Notebook for its interactive interface.
 
