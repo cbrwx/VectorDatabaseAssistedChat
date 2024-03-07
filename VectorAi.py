@@ -7,28 +7,34 @@ from sklearn.neighbors import NearestNeighbors
 from sentence_transformers import SentenceTransformer
 from scipy.spatial.distance import cosine
 import pickle
+import warnings
+
+# Suppress specific deprecation warnings
+warnings.filterwarnings("ignore", message="torch.utils._pytree._register_pytree_node is deprecated")
+global global_conversation_history
+global_conversation_history = ""
 
 class SimpleVectorDatabase:
     def __init__(self, filepath=None):
         self.filepath = filepath
         self.vectors = None
         self.messages = []
-        if self.filepath:  # if a filepath is provided, attempt to load existing data
+        if self.filepath:  # If a filepath is provided, attempt to load existing data
             self.load()
 
     def add_vector(self, vector, message):
         if self.vectors is None:
             self.vectors = np.array([vector])
         else:
-            # make sure self.vectors is a numpy array before trying to stack
+            # Ensure that self.vectors is a numpy array before trying to stack
             if not isinstance(self.vectors, np.ndarray):
                 self.vectors = np.array(self.vectors)
             self.vectors = np.vstack([self.vectors, vector])
         self.messages.append(message)
-        self.save()  # save the database state after adding a new vector/message
+        self.save()  # Save the database state after adding a new vector/message
         
     def add_interaction(self, query_vector, query_message, response_vector, response_message):
-        # adds both the query and the response to the database
+        # Adds both the query and the response to the database
         if self.vectors is None:
             self.vectors = np.array([query_vector, response_vector])
         else:
@@ -72,26 +78,42 @@ def encode_message_to_vector(message):
     return model_encoder.encode(message, show_progress_bar=True)
 
 def chat(user_input, context_messages=[]):
-    instruction = "Respond concisely, focusing on the user's current question. Below is the context provided:"
+    global global_conversation_history
+    
+    # Fetch similar context messages from the vector database based on the current user input
+    input_vector = encode_message_to_vector(user_input)
+    similar_messages = vector_db.find_similar_messages(input_vector, n=5)
+    # Assuming 'find_similar_messages' returns a list of message strings
+    vector_based_context = "\n".join([f"Vector Context: {msg}" for msg in similar_messages])
+
+    instruction = "\n--- Respond concisely, focusing on the user's current question. Below is the context provided:"
+    
     if context_messages:
         recent_context = context_messages[-1]  # last message is the most relevant
         background_context = " ".join(context_messages[:-1]) if len(context_messages) > 1 else ""
-
-        recent_context_formatted = f"Most Recent Context: {recent_context}."
-        background_context_formatted = f"Background Information: {background_context}." if background_context else ""
+        
+        recent_context_formatted = f"\n--- Most Recent Context:\n{recent_context}."
+        background_context_formatted = f"\n--- Background Information:\n{background_context}." if background_context else ""
         
         full_context = f"{instruction} {recent_context_formatted} {background_context_formatted}"
     else:
-        full_context = instruction   
-    user_query = f"User's Current Query: {user_input}"    
-    full_message = f"{full_context} {user_query}"
+        full_context = instruction
 
-    # Uncomment below for debugging pleasures
-    # print("\nSending the following structured message to the model for context:\n")
-    # print(full_message)
-    # print("\n-----------------------------------------\n")
+    # Update the global conversation history with clear labeling for user and model
+    # Trim before appending to ensure we only keep the last 2000 chars
+    if len(global_conversation_history) > 2000:
+        global_conversation_history = global_conversation_history[-2000:]
+    global_conversation_history += f"\nUser: {user_input}"
 
-    try:     
+    user_query = f"\n--- User's Current Query and your main task while taking all other information relevant into consideration:\n{user_input}"
+    # Include both the vector-based context and conversation history in the message sent to the model
+    full_message = f"{full_context}\n{vector_based_context}\n--- Conversation History (up to 2000 chars):\n{global_conversation_history}\n{user_query}"
+
+    print("\nSending the following structured message to the model for context:\n")
+    print(full_message)
+    print("\n-----------------------------------------\n")
+
+    try:
         response = requests.post(
             "http://localhost:11434/api/chat",
             json={
@@ -102,7 +124,7 @@ def chat(user_input, context_messages=[]):
         )
         response.raise_for_status()
 
-        # process the response from the model
+        # Process the response from the model
         output = ""
         for line in response.iter_lines():
             if line:
@@ -115,6 +137,11 @@ def chat(user_input, context_messages=[]):
                 else:
                     break
 
+        # Trim before appending to keep the last 2000 chars
+        if len(global_conversation_history) + len(f"\nModel: {output}") > 2000:
+            global_conversation_history = global_conversation_history[-(2000-len(f"\nModel: {output}")):]
+        global_conversation_history += f"\nModel: {output}"
+
         return {"content": output}
     except requests.RequestException as e:
         print(f"Request failed: {e}")
@@ -125,7 +152,7 @@ text_area = widgets.Textarea(
     placeholder='Type your message here...',
     description='Input:',
     disabled=False,
-    layout=widgets.Layout(width='100%', height='200px')
+    layout=widgets.Layout(width='98%', height='200px')
 )
 send_button = widgets.Button(
     description='Send',
@@ -155,13 +182,14 @@ def on_send_button_clicked(b):
         context_messages = [msg for msg in similar_messages]
         # call the chat function with user input and context
         response = chat(user_input, context_messages)
-        print(f"CBot: {response['content']}")
+        print(f"OdinAI: {response['content']}")
         # store the user input and bot response in the vector database
         vector_db.add_vector(input_vector, user_input)
         if response['content']:
             response_vector = encode_message_to_vector(response['content'])
             vector_db.add_vector(response_vector, response['content'])
+
         text_area.value = ''  
-      
+
 # Attach event to the send button
 send_button.on_click(on_send_button_clicked)
