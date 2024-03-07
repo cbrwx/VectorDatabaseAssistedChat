@@ -34,7 +34,6 @@ class SimpleVectorDatabase:
         self.messages.append(message)
         self.types.append(msg_type)  # Store the type of the message
         self.save()
-
         
     def add_interaction(self, query_vector, query_message, response_vector, response_message):
         # Adds both the query and the response to the database
