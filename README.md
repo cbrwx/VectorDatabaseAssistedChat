@@ -53,6 +53,6 @@ Cosine similarity is used to compare vectors, identifying which stored messages 
 The vector database supports dynamic updates, allowing new interactions to be seamlessly integrated into the dataset. It is designed for efficient querying, ensuring that response generation is both timely and relevant.
 
 ## Ollama Integration
-Ollama's role as a local LLM manager is critical for abstracting away the complexities of API communication with the LLM. This simplifies the process of sending requests and processing responses, making the overall system more robust and easier to maintain. (https://ollama.ai/)
+Ollama's role as a local LLM manager is critical for abstracting away the complexities of API communication with the LLM. This simplifies the process of sending requests, setting up llms, maintaining models, and processing responses, making the overall system more robust and easier to maintain. (https://ollama.ai/)
 
 .cbrwx
