@@ -99,7 +99,6 @@ def encode_message_to_vector(message, model_encoder=None, chunk_size=256):
     
     return vector
 
-
 def chat(user_input, context_messages=[]):
     global global_conversation_history
     
@@ -170,7 +169,6 @@ def chat(user_input, context_messages=[]):
     except requests.RequestException as e:
         print(f"Request failed: {e}")
         return {"content": "Error processing your request."}
-
 
 # initialize little cars
 text_area = widgets.Textarea(
