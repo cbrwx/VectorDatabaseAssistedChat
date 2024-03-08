@@ -8,6 +8,8 @@ from sentence_transformers import SentenceTransformer
 from scipy.spatial.distance import cosine
 import pickle
 import warnings
+import torch
+from transformers import LongformerModel, LongformerTokenizer
 
 # Suppress specific deprecation warnings
 warnings.filterwarnings("ignore", message="torch.utils._pytree._register_pytree_node is deprecated")
@@ -75,12 +77,28 @@ class SimpleVectorDatabase:
         
 vector_db = SimpleVectorDatabase(filepath='vector_database.pkl')        
 
-# initialize SentenceTransformer model for encoding messages to vectors
-model_encoder = SentenceTransformer('all-MiniLM-L6-v2')
+def encode_message_to_vector(message, model_encoder=None, chunk_size=256):
+    # Split the message into chunk_size-word chunks chunk chunks...
+    words = message.split()
+    chunks = [' '.join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+    
+    # Initialize model_encoder if it's not passed as an argument
+    if model_encoder is None:
+        model_encoder = SentenceTransformer('all-MiniLM-L6-v2')
+    
+    # Encode each chunk to get a list of vectors chunks
+    chunk_vectors = [model_encoder.encode(chunk, show_progress_bar=False) for chunk in chunks]
+    
+    # Aggregate the vectors by taking the mean vector by pretending to be a chunk
+    if len(chunk_vectors) > 0:
+        vector = np.mean(chunk_vectors, axis=0)
+    else:
+        # Handle the case where the message might be empty or too short or the chunks are hiding
+        vector_dimension = model_encoder.get_sentence_embedding_dimension()
+        vector = np.zeros(vector_dimension)
+    
+    return vector
 
-def encode_message_to_vector(message):
-    #print("\nEncoding message:", message)
-    return model_encoder.encode(message, show_progress_bar=True)
 
 def chat(user_input, context_messages=[]):
     global global_conversation_history
@@ -89,15 +107,15 @@ def chat(user_input, context_messages=[]):
     input_vector = encode_message_to_vector(user_input)
     similar_messages = vector_db.find_similar_messages(input_vector, n=5)
     # Assuming 'find_similar_messages' returns a list of message strings
-    vector_based_context = "\n".join([f"Vector Context: {msg}" for msg in similar_messages])
+    vector_based_context = "\n".join([f"\033[96mVector Context:\033[0m {msg}" for msg in similar_messages])
 
     instruction = "\n--- Respond concisely, focusing on the user's current question. Below is the context provided:"
     
     if context_messages:
         recent_context = context_messages[-1]  # last message is the most relevant
         background_context = " ".join(context_messages[:-1]) if len(context_messages) > 1 else ""        
-        recent_context_formatted = f"\n--- Most Recent Context:\n{recent_context}."
-        background_context_formatted = f"\n--- Background Information:\n{background_context}." if background_context else ""        
+        recent_context_formatted = f"\n\x1b[92m--- Most Recent Context:\x1b[0m\n{recent_context}."
+        background_context_formatted = f"\n\x1b[92m--- Background Information:\x1b[0m\n{background_context}." if background_context else ""
         full_context = f"{instruction} {recent_context_formatted} {background_context_formatted}"
     else:
         full_context = instruction
@@ -107,18 +125,22 @@ def chat(user_input, context_messages=[]):
         global_conversation_history = global_conversation_history[-5000:]
     global_conversation_history += f"\nUser: {user_input}"
 
-    user_query = f"\n--- Priority Instruction: Respond directly to the user's current query below. It is imperative that this query is the main focus of your response. While formulating your answer, please integrate and consider all available contextual information provided. This query is the central point of your response, and all other context should support in understanding and addressing this specific inquiry: {user_input}"
+    user_query = f"\n\x1b[1;92mPriority Instruction:\x1b[0m Respond directly to the user's current query below. It is imperative that this query is the main focus of your response. While formulating your answer, please integrate and consider all available contextual information provided. This query is the central point of your response, remember the user cannot see all your context, so reply to the user like its from your memory not from the context i give you in the beginning of the message Remeber the user cannot see your context so no need to explain it but rather use your context as data! And all other context should support in understanding and addressing this specific inquiry, So again consider everything before this as context and memory, this is your MAIN TASK: {user_input}"
+
     # Include both the vector-based context and conversation history in the message sent to the model
-    full_message = f"{full_context}\n{vector_based_context}\n--- Conversation History (up to 5000 chars):\n{global_conversation_history}\n{user_query}"
+    full_message = f"{full_context}\n{vector_based_context}\n\033[92m--- Conversation History:\033[0m (up to 5000 chars):\n{global_conversation_history}\n{user_query}"
 
     print("\nSending the following structured message to the model for context:\n")
-    print(full_message)
+    print(full_message)    
+    
     print("\n-----------------------------------------\n")
+    print("\x1b[1;92m[Updating MainFrame]\x1b[0m\n")    
 
     try:
         response = requests.post(
             "http://localhost:11434/api/chat",
             json={
+#                 "model": "dolphin-mistral",
                 "model": "odinai",
                 "messages": [{"role": "user", "content": full_message}],
                 "stream": True,
@@ -139,7 +161,7 @@ def chat(user_input, context_messages=[]):
                 else:
                     break
 
-        # Trim before appending to keep the last 2000 chars
+        # Trim before appending to keep the last 5000 chars as conversation history
         if len(global_conversation_history) + len(f"\nOdinAI: {output}") > 5000:
             global_conversation_history = global_conversation_history[-(5000-len(f"\nOdinAI: {output}")):]
         global_conversation_history += f"\nOdinAI: {output}"
@@ -148,6 +170,7 @@ def chat(user_input, context_messages=[]):
     except requests.RequestException as e:
         print(f"Request failed: {e}")
         return {"content": "Error processing your request."}
+
 
 # initialize little cars
 text_area = widgets.Textarea(
@@ -165,7 +188,7 @@ send_button = widgets.Button(
 )
 output_field = widgets.Output()
 
-# display stales
+# display stales and join discord
 display(text_area, send_button, output_field)
 
 def on_send_button_clicked(b):
@@ -184,7 +207,7 @@ def on_send_button_clicked(b):
         similar_messages = vector_db.find_similar_messages(input_vector, n=5)
         context_messages = [msg for msg in similar_messages]
         response = chat(user_input, context_messages)
-        print(f"OdinAI: {response['content']}")
+        print(f"\x1b[1;92mOdinAI:\x1b[0m {response['content']}")
 
         # After receiving the response from the model, encode it and add to the database as a 'model' type message
         if response['content']:
