@@ -78,7 +78,8 @@ class SimpleVectorDatabase:
 vector_db = SimpleVectorDatabase(filepath='vector_database.pkl')        
 
 def encode_message_to_vector(message, model_encoder=None, chunk_size=256):
-    # Split the message into chunk_size-word chunks chunk chunks...
+    # Ensure chunk_size is in terms of tokens for the model, adjust as needed
+    # Split the message into chunk_size-word chunks
     words = message.split()
     chunks = [' '.join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
     
@@ -86,16 +87,23 @@ def encode_message_to_vector(message, model_encoder=None, chunk_size=256):
     if model_encoder is None:
         model_encoder = SentenceTransformer('all-MiniLM-L6-v2')
     
-    # Encode each chunk to get a list of vectors chunks
-    chunk_vectors = [model_encoder.encode(chunk, show_progress_bar=False) for chunk in chunks]
+    vectors = []
+    for chunk in chunks:
+        # Ensure the model does not receive too large of a chunk by checking its token length
+        encoded_chunk = model_encoder.encode(chunk, show_progress_bar=False, convert_to_tensor=True)
+        vectors.append(encoded_chunk)
     
-    # Aggregate the vectors by taking the mean vector by pretending to be a chunk
-    if len(chunk_vectors) > 0:
-        vector = np.mean(chunk_vectors, axis=0)
+    # Aggregate the vectors by taking the mean vector if there are multiple chunks
+    if vectors:
+        vector = torch.mean(torch.stack(vectors), dim=0)
     else:
-        # Handle the case where the message might be empty or too short or the chunks are hiding
+        # Handle the case where the message might be empty or too short
         vector_dimension = model_encoder.get_sentence_embedding_dimension()
         vector = np.zeros(vector_dimension)
+    
+    # Convert the tensor back to a numpy array if needed
+    if isinstance(vector, torch.Tensor):
+        vector = vector.cpu().numpy()
     
     return vector
 
