@@ -51,6 +51,8 @@ This repository contains the implementation of a context-aware chat system that 
 
 - **Dendrogram Visualization**: Call `vector_db.plot_dendrogram()` to visualize the clustering of messages, providing insights into the semantic organization of the database.
 
+![download (33)](https://github.com/cbrwx/VectorDatabaseAssistedChat/assets/81207429/6fe3b10f-3ac7-42cb-afb1-51b7ebe61bfc)
+
 ### Integration with Ollama
 
 - **Purpose**: Enables direct interaction with configured LLMs for dynamic response generation.
