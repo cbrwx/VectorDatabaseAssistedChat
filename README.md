@@ -1,5 +1,5 @@
 ![f323f](https://github.com/cbrwx/VectorDatabaseAssistedChat/assets/81207429/06fe406c-eaf4-4aaf-8061-5461c3639a83)
-# Context-Aware Chat System with Vector Database
+# OdinAI; a context-Aware Chat System with Vector Database memory
 
 This repository contains the implementation of a context-aware chat system that integrates a vector database for enhancing the contextual understanding and response quality of a chat interface. This system leverages the power of sentence embeddings, hierarchical clustering, and direct interaction with Large Language Models (LLMs) via Ollama.
 
