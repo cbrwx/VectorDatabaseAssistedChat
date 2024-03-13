@@ -33,7 +33,7 @@ This repository contains the implementation of OdinAI, a context-aware chat syst
 - **Similar Message Retrieval (`find_similar_messages`)**: Utilizes dimensionality reduction to streamline the retrieval of messages that are contextually similar to a given query vector. This feature is crucial for providing contextually relevant responses and ensuring the system's efficiency in processing and organizing large volumes of data.
 - **Persistence (`save`, `load`)**: Provides mechanisms for saving the current state of the vector database to disk and loading an existing database, facilitating continuity across sessions.
 
-## Shell Command Interpretation and Execution
+## Shell Command Interpretation and Execution (use with caution)
 
 An innovative feature that interprets natural language descriptions of desired system actions and translates them into executable shell commands, enhancing the chat interface's functionality.
 
@@ -50,6 +50,18 @@ To use this feature, describe the action prefixed with "!shell". For example:
 !shell delete temporary files in the current directory
 ```
 The system will interpret the action, execute the corresponding shell command, and display the output.
+```
+C:\windows\system32>format c: /fs:NTFS
+The type of the file system is NTFS.
+
+WARNING, ALL DATA ON NON-REMOVABLE DISK
+DRIVE C: WILL BE LOST!
+Proceed with Format (Y/N) Y
+
+Format is formatting the volume while giving you a cautionary tale.
+100% complete.
+>_
+```
 
 ## Server Setup for Shell Command Execution
 
