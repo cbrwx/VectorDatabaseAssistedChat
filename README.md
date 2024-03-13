@@ -93,5 +93,6 @@ Direct interaction with LLMs through Ollama for dynamic response generation, ena
 - **LLM Expansion**: Extending interactions to multiple LLMs for a broader range of responses and capabilities.
 - **User Interface Enhancements**: Further developing the interactive interface for an even more engaging and intuitive user experience, thru both api and commandline.
 - Implement a structured programming task management and integration system using !codetask command, outlining program structure, managing tasks sequentially, and integrating code snippets into a cohesive program with continuous model updates and feedback for error corrections.
+- Implement whitelist for commands within shell_server.
 
 .cbrwx
